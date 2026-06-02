@@ -1,0 +1,57 @@
+# ⚠️ 점검 전용 랩 — 의도적 misconfiguration (프로덕션 금지)
+# baseline 대비 이스케이프 표면이 넓어지는지 비교 테스트용
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csap-escape-probe-lab
+  labels:
+    app: csap-escape-probe
+    profile: lab-misconfigured
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csap-escape-probe
+      profile: lab-misconfigured
+  template:
+    metadata:
+      labels:
+        app: csap-escape-probe
+        profile: lab-misconfigured
+    spec:
+      hostPID: true
+      containers:
+        - name: probe
+          image: csap-node-escape-probe:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            allowPrivilegeEscalation: true
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENABLE_ACTIVE_TESTS
+              value: "1"
+            - name: HOST_PID
+              value: "true"
+            - name: PROBE_IMAGE_TAG
+              value: "lab-misconfigured"
+            - name: MCP_SERVER_NAME
+              value: "csap-node-escape-probe-lab"
+          volumeMounts:
+            - name: reports
+              mountPath: /data/reports
+            # 랩에서만: 호스트 루트 바인드 (일부 클러스터 정책에서 차단됨)
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+      volumes:
+        - name: reports
+          emptyDir: {}
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
