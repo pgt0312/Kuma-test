@@ -9,6 +9,7 @@ services:
       ENABLE_ACTIVE_TESTS: "0"
       PROBE_IMAGE_TAG: "docker-compose"
       MCP_SERVER_NAME: "csap-node-escape-probe"
+      PROBE_MIN_INTERVAL_SEC: "60"
     # 로컬 privileged 비교 테스트 시 아래 주석 해제 (주의)
     # privileged: true
     # pid: host

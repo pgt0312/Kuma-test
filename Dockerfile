@@ -1,15 +1,26 @@
-# PlayMCP MCP (8080/mcp) + escape probe — push to registry before UI registration
+# PlayMCP「Git 소스 빌드」용 MCP 서버 이미지
+# - 레포 루트에 Dockerfile 필수 (PlayMCP 기본: dockerfile=Dockerfile)
+# - Streamable HTTP :8080/mcp, GET /health
 FROM python:3.12-slim-bookworm
+
+LABEL org.opencontainers.image.title="csap-node-escape-probe" \
+      org.opencontainers.image.description="PlayMCP MCP + container escape surface probe (read-only)" \
+      playmcp.transport="streamablehttp" \
+      playmcp.port="8080" \
+      playmcp.path="/mcp"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080 \
     MCP_SERVER_NAME=csap-node-escape-probe \
-    MCP_SERVER_VERSION=2.0.0-mcp \
+    MCP_SERVER_VERSION=2.1.0-playmcp-git \
     PROBE_REPORT_DIR=/data/reports \
     ENABLE_ACTIVE_TESTS=0 \
+    ENABLE_SAFE_NET_CHECKS=0 \
+    PROBE_MIN_INTERVAL_SEC=60 \
     RUN_PROBE_ON_START=1 \
-    ENV_PROFILE=test
+    ENV_PROFILE=playmcp \
+    LOG_LEVEL=info
 
 WORKDIR /opt/app
 
@@ -29,6 +40,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server.py .
 COPY probe/ ./probe/
+
 RUN chmod +x ./probe/entrypoint.sh ./probe/active_checks.sh \
     && mkdir -p /data/reports \
     && useradd --create-home --uid 10001 probeuser \
@@ -38,7 +50,7 @@ USER probeuser
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
 ENTRYPOINT ["/opt/app/probe/entrypoint.sh"]

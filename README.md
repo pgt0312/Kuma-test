@@ -1,15 +1,32 @@
 # CSAP — PlayMCP MCP + 컨테이너 이스케이프·안전 검증 (확장본)
 
-> **이 디렉터리**는 `csap-node-escape-probe-internal` 에서 개발 중인 **전체 기능**의 복제본입니다.  
-> **원본** [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/) 은 v2 **기본 이스케이프 진단**만 유지합니다.
+> **PlayMCP「Git 소스 빌드」** — 이 폴더 **전체**를 Git remote 루트로 push (`Dockerfile`이 **루트**에 있음).  
+> UI 등록값·검증 절차: **[`PLAYMCP_GIT_BUILD.md`](./PLAYMCP_GIT_BUILD.md)**  
+> **원본** [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/) — v2 기본만 (`repo/` 하위 구조).
 
-| 구분 | `csap-node-escape-probe-internal` | **`csap-node-escape-probe-internal-full` (여기)** |
-|------|-----------------------------------|---------------------------------------------------|
-| 이스케이프 프로브 `R-*` | ✅ | ✅ |
-| 안전 검증 `V-*` | ❌ | ✅ |
+| 구분 | `internal` (원본) | **`internal-full` (여기)** |
+|------|-------------------|----------------------------|
+| Git 빌드 레포 루트 | `repo/` 내용만 push | **이 디렉터리 루트** push |
+| `R-*` / `V-*` | R만 | R + V |
 | PlayMCP 모니터링 힌트 | ❌ | ✅ |
-| `run_safe_verification` / `/probe/safe-verify` | ❌ | ✅ |
-| 프로브 호출 간격 제한 | ❌ | ✅ |
+
+---
+
+## 0. PlayMCP Git 소스 빌드 (빠른 시작)
+
+| UI 필드 | 값 |
+|---------|-----|
+| MCP 서버 이름 | `csap-node-escape-probe` |
+| Git URL | 이 저장소 URL |
+| 브랜치 | `main` |
+| Dockerfile | `Dockerfile` (기본) |
+| 배포 후 포트 | **8080**, transport **streamablehttp**, path **`/mcp`** |
+
+```bash
+docker build -t csap-node-escape-probe:playmcp-git .
+docker run --rm -p 8080:8080 csap-node-escape-probe:playmcp-git
+curl -s http://127.0.0.1:8080/health
+```
 
 ---
 
@@ -188,10 +205,13 @@ PlayMCP InferenceService/Istio: [`../24_playmcp_istio_inference_service.md`](../
 | MCP URL | `http://<svc>:8080/mcp` |
 
 ```bash
-cd repo
+# Git 소스 빌드: PlayMCP가 clone 후 docker build (로컬 검증)
+docker build -t csap-node-escape-probe:playmcp-git .
+
+# 레지스트리 직접 push 시
 export REGISTRY=<harbor>/<project>
-make build TAG=v2-mcp-full
-make push TAG=v2-mcp-full REGISTRY=$REGISTRY
+make build TAG=playmcp-git
+make push TAG=playmcp-git REGISTRY=$REGISTRY
 ```
 
 ### 10.2 MCP vs 모니터링 vs Kubelet
@@ -236,11 +256,11 @@ env:
 
 | 프로파일 | 파일 | 기대 |
 |----------|------|------|
-| baseline | `repo/k8s/deployment-baseline.yaml` | `R-*`/`V-*` 적음 |
-| lab | `repo/k8s/deployment-lab-misconfigured.yaml` | critical/high 증가 |
+| baseline | `k8s/deployment-baseline.yaml` | `R-*`/`V-*` 적음 |
+| lab | `k8s/deployment-lab-misconfigured.yaml` | critical/high 증가 |
 
 ```bash
-kubectl apply -f repo/k8s/deployment-baseline.yaml -f repo/k8s/service.yaml
+kubectl apply -f k8s/deployment-baseline.yaml -f k8s/service.yaml
 kubectl port-forward svc/csap-escape-probe 8080:8080
 curl -s -X POST http://127.0.0.1:8080/probe/run | jq '.summary'
 curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
@@ -254,7 +274,7 @@ curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 |------|------|------|
 | `PORT` | `8080` | HTTP·MCP |
 | `MCP_SERVER_NAME` | `csap-node-escape-probe` | MCP·IS 이름 참고 |
-| `MCP_SERVER_VERSION` | `2.0.0-mcp` | |
+| `MCP_SERVER_VERSION` | `2.1.0-playmcp-git` | |
 | `RUN_PROBE_ON_START` | `1` | 기동 시 1회 프로브 |
 | `PROBE_REPORT_DIR` | `/data/reports` | JSON 저장 |
 | `ENABLE_ACTIVE_TESTS` | `0` | active_checks |
@@ -300,19 +320,19 @@ curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 
 | 경로 | 용도 |
 |------|------|
-| [`repo/server.py`](./repo/server.py) | FastMCP + Starlette |
-| [`repo/probe/run_probe.py`](./repo/probe/run_probe.py) | `R-*` |
-| [`repo/probe/safe_verification.py`](./repo/probe/safe_verification.py) | `V-*` |
-| [`repo/probe/playmcp_monitoring.py`](./repo/probe/playmcp_monitoring.py) | UI 힌트 |
-| [`repo/probe/active_checks.sh`](./repo/probe/active_checks.sh) | 활성 읽기 검사 |
-| [`repo/k8s/`](./repo/k8s/) | baseline / lab |
+| [`server.py`](./server.py) | FastMCP + Starlette |
+| [`probe/run_probe.py`](./probe/run_probe.py) | `R-*` |
+| [`probe/safe_verification.py`](./probe/safe_verification.py) | `V-*` |
+| [`probe/playmcp_monitoring.py`](./probe/playmcp_monitoring.py) | UI 힌트 |
+| [`probe/active_checks.sh`](./probe/active_checks.sh) | 활성 읽기 검사 |
+| [`k8s/`](./k8s/) | baseline / lab |
 
 ---
 
 ## 16. 빠른 명령
 
 ```bash
-cd playmcp/csap-node-escape-probe-internal-full/repo
+cd playmcp/csap-node-escape-probe-internal-full
 make build && make run
 make mcp-health
 

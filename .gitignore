@@ -1,1 +1,7 @@
 *.tar
+__pycache__/
+*.pyc
+.venv/
+.env
+/data/reports/*.json
+.DS_Store

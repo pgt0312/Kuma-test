@@ -54,6 +54,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: PROBE_MIN_INTERVAL_SEC
+              value: "60"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false

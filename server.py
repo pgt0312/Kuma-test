@@ -24,7 +24,7 @@ from probe.playmcp_monitoring import playmcp_monitoring_info
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
 
 SERVICE_NAME = os.environ.get("MCP_SERVER_NAME", "csap-node-escape-probe")
-SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.0.0-mcp")
+SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.0-playmcp-git")
 
 mcp = FastMCP(
     SERVICE_NAME,

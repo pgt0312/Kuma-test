@@ -1,0 +1,28 @@
+# PlayMCP 모니터링 — InferenceService 참고 (Git 빌드 이미지와 이름 일치)
+# metadata.name = PlayMCP「MCP 서버 이름」csap-node-escape-probe
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: csap-node-escape-probe
+  namespace: REPLACE_NAMESPACE
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: REPLACE_REGISTRY/csap-node-escape-probe:playmcp-git
+        ports:
+          - containerPort: 8080
+        env:
+          - name: PORT
+            value: "8080"
+          - name: MCP_SERVER_NAME
+            value: "csap-node-escape-probe"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080

@@ -5,7 +5,8 @@ echo "[entrypoint] ${MCP_SERVER_NAME:-csap-node-escape-probe} — MCP :8080/mcp 
 
 PORT="${PORT:-8080}"
 echo "[entrypoint] Streamable HTTP MCP at http://0.0.0.0:${PORT}/mcp"
-echo "[entrypoint] REST: /health /probe/latest POST /probe/run"
+echo "[entrypoint] REST: /health /probe/latest POST /probe/run POST /probe/safe-verify"
+echo "[entrypoint] PlayMCP: register via Git build — see PLAYMCP_GIT_BUILD.md"
 
 cd /opt/app
 exec uvicorn server:app --host 0.0.0.0 --port "${PORT}"

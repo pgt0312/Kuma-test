@@ -1,5 +1,5 @@
 IMAGE ?= csap-node-escape-probe
-TAG ?= v2-mcp
+TAG ?= playmcp-git
 REGISTRY ?=
 PORT ?= 8080
 DOCKER_CONFIG ?= /tmp/docker-nocreds

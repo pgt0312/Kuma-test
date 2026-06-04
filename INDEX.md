@@ -1,16 +1,17 @@
-# csap-node-escape-probe-internal-full — 확장 기능 복제본
+# csap-node-escape-probe-internal-full
 
-| 경로 | 용도 |
+**PlayMCP Git 소스 빌드용** — 레포 **루트** = Docker 빌드 컨텍스트 (`Dockerfile` 위치)
+
+| 문서 | 용도 |
 |------|------|
-| [`README.md`](./README.md) | **전체 기능 설명** (MCP·REST·R-*·V-*·PlayMCP·K8s) |
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | 배포 4층 다이어그램 |
-| [`repo/`](./repo/) | 확장 소스 (`safe_verification`, `playmcp_monitoring` 포함) |
-
-원본(v2 기본): [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/)
+| **[`PLAYMCP_GIT_BUILD.md`](./PLAYMCP_GIT_BUILD.md)** | ★ UI 필드·API·push 전 검증 |
+| [`README.md`](./README.md) | 전체 기능 설명 |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | 배포 4층 |
 
 ```bash
-cd playmcp/csap-node-escape-probe-internal-full/repo
-make build TAG=v2-mcp-full
+# 이 디렉터리 = Git remote 루트
+docker build -t csap-node-escape-probe:playmcp-git .
 make run
-curl -s http://127.0.0.1:8080/probe/safe-verify | python3 -m json.tool
 ```
+
+기본(v2) 원본: [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/)
