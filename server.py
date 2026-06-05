@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
-from starlette.routing import Mount, Route
+from starlette.routing import Route
 
 from probe.monitoring_hints import monitoring_info
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
@@ -187,7 +187,7 @@ app = Starlette(
         Route("/probe/latest", rest_probe_latest, methods=["GET"]),
         Route("/probe/manual", rest_manual, methods=["GET"]),
         Route("/monitoring/hints", rest_monitoring_hints, methods=["GET"]),
-        Mount("/mcp", app=mcp.streamable_http_app()),
+        *mcp.streamable_http_app().routes,
     ],
     lifespan=lifespan,
 )

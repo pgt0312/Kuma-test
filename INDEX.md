@@ -16,3 +16,5 @@ make apply-is NS=<ns> MCP_NAME=csap-node-escape-probe IMAGE=<registry>/...:tag
 ```
 
 기본(v2) 원본: [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/)
+
+로컬 이미지 백업: [`../images/csap-node-escape-probe-git-build.tar`](../images/csap-node-escape-probe-git-build.tar) — `docker load -i` 후 `csap-node-escape-probe:git-build`
