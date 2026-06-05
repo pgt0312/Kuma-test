@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-PlayMCP 호환 MCP 서버 + 컨테이너→노드 이스케이프 진단.
+Streamable HTTP MCP 서버 + 컨테이너→노드 이스케이프 진단.
 
-- MCP (PlayMCP / streamablehttp): http://<host>:${PORT}/mcp (KServe 기본 PORT=8000)
+- MCP (streamablehttp): http://<host>:${PORT}/mcp (KServe 기본 PORT=8000)
 - 헬스: GET /health, /healthz
 - REST (호환): GET /probe/latest, POST /probe/run
 """
@@ -20,17 +20,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Mount, Route
 
-from probe.playmcp_monitoring import playmcp_monitoring_info
+from probe.monitoring_hints import monitoring_info
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
 
 SERVICE_NAME = os.environ.get("MCP_SERVER_NAME", "csap-node-escape-probe")
-SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.1-playmcp-git")
+SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.1-git")
 
 mcp = FastMCP(
     SERVICE_NAME,
     json_response=True,
     instructions=(
-        "PlayMCP 점검용 MCP 서버입니다. "
+        "CSAP 점검용 MCP 서버입니다. "
         "echo/add/server_info 로 연결을 확인하고, "
         "run_escape_probe 로 컨테이너→노드 이스케이프 표면을 진단하세요. "
         "자동 익스플로잇은 수행하지 않습니다."
@@ -61,14 +61,14 @@ def server_info() -> dict[str, Any]:
         "transport": "streamable-http",
         "mcp_path": "/mcp",
         "modes": ["mcp", "escape_probe"],
-        "playmcp_monitoring": playmcp_monitoring_info(),
+        "monitoring_hints": monitoring_info(),
     }
 
 
 @mcp.tool()
-def playmcp_monitoring_checklist() -> dict[str, Any]:
-    """PlayMCP 모니터링(InferenceService/Istio) 실패 시 점검 체크리스트."""
-    return playmcp_monitoring_info()
+def monitoring_checklist() -> dict[str, Any]:
+    """모니터링(InferenceService/Istio) 실패 시 점검 체크리스트."""
+    return monitoring_info()
 
 
 @mcp.tool()
@@ -150,15 +150,15 @@ async def rest_probe_latest(_request: Request) -> JSONResponse:
 
 async def rest_manual(_request: Request) -> PlainTextResponse:
     return PlainTextResponse(
-        "PlayMCP: register with port 8000 (KServe kserve-mcpserver), path /mcp. "
+        "Register with port 8000 (KServe kserve-mcpserver), path /mcp. "
         "MCP tools: echo, add, server_info, run_escape_probe, run_safe_verification, "
-        "playmcp_monitoring_checklist. POST /probe/safe-verify = read-only checks only. "
-        "Monitoring: GET /playmcp/monitoring-hints — see playmcp/24_playmcp_istio_inference_service.md"
+        "monitoring_checklist. POST /probe/safe-verify = read-only checks only. "
+        "Monitoring: GET /monitoring/hints — see GIT_BUILD.md / 24_istio_inference_service_monitoring.md"
     )
 
 
-async def rest_playmcp_monitoring(_request: Request) -> JSONResponse:
-    return JSONResponse(playmcp_monitoring_info())
+async def rest_monitoring_hints(_request: Request) -> JSONResponse:
+    return JSONResponse(monitoring_info())
 
 
 def _probe_on_start_background() -> None:
@@ -186,7 +186,7 @@ app = Starlette(
         Route("/probe/safe-verify", rest_safe_verify, methods=["POST", "GET"]),
         Route("/probe/latest", rest_probe_latest, methods=["GET"]),
         Route("/probe/manual", rest_manual, methods=["GET"]),
-        Route("/playmcp/monitoring-hints", rest_playmcp_monitoring, methods=["GET"]),
+        Route("/monitoring/hints", rest_monitoring_hints, methods=["GET"]),
         Mount("/mcp", app=mcp.streamable_http_app()),
     ],
     lifespan=lifespan,

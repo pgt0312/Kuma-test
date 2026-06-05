@@ -1,4 +1,4 @@
-"""PlayMCP 모니터링 탭(InferenceService / Istio) 점검용 메타 — 비밀 없음."""
+"""모니터링 탭(InferenceService / Istio) 점검용 메타 — 비밀 없음."""
 from __future__ import annotations
 
 import os
@@ -6,13 +6,13 @@ import socket
 from typing import Any
 
 
-def playmcp_monitoring_info() -> dict[str, Any]:
+def monitoring_info() -> dict[str, Any]:
     mcp_name = os.environ.get("MCP_SERVER_NAME", "")
     ns = os.environ.get("POD_NAMESPACE", "")
     return {
         "mcp_server_name_for_isvc": mcp_name,
         "hint": (
-            "PlayMCP monitoring expects a Kubeflow/KServe InferenceService with "
+            "Hosting UI monitoring expects a Kubeflow/KServe InferenceService with "
             "metadata.name == MCP registration name (endpoint_name). "
             "Plain Deployment-only workloads do not populate the Istio metrics chart."
         ),
@@ -28,17 +28,17 @@ def playmcp_monitoring_info() -> dict[str, Any]:
         ),
         "checks": [
             f"kubectl get inferenceservice -n {ns or '<ns>'} {mcp_name or '<mcp-name>'}",
-            "If missing: scripts/apply-inferenceservice-for-playmcp.sh (see PLAYMCP_GIT_BUILD.md)",
-            "Confirm PlayMCP detail API endpoint_name matches InferenceService name",
+            "If missing: scripts/apply-inferenceservice.sh (see GIT_BUILD.md)",
+            "Confirm hosting UI endpoint_name matches InferenceService name",
             "GET /api/v2/mcp/my-mcp-servers/{id}/istio-traffic?range=1h",
             "Generate Playground traffic then re-open monitoring tab",
         ],
-        "fix_script": "scripts/apply-inferenceservice-for-playmcp.sh",
+        "fix_script": "scripts/apply-inferenceservice.sh",
         "fix_example": (
-            "MCP_NAME=csap-node-escape-probe NS=<ns> IMAGE=<playmcp-image> "
-            "./scripts/apply-inferenceservice-for-playmcp.sh"
+            "MCP_NAME=csap-node-escape-probe NS=<ns> IMAGE=<built-image> "
+            "./scripts/apply-inferenceservice.sh"
         ),
-        "doc": "playmcp/24_playmcp_istio_inference_service.md",
+        "doc": "24_istio_inference_service_monitoring.md",
         "runtime": {
             "hostname": socket.gethostname(),
             "pod_name": os.environ.get("POD_NAME", ""),

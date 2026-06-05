@@ -1,7 +1,7 @@
-# PlayMCP Git 소스 빌드 후 모니터링 탭용 InferenceService
-# 적용: scripts/apply-inferenceservice-for-playmcp.sh (envsubst)
+# Git 소스 빌드 후 모니터링 탭용 InferenceService
+# 적용: scripts/apply-inferenceservice.sh (envsubst)
 #
-# metadata.name MUST equal PlayMCP「MCP 서버 이름」and API endpoint_name
+# metadata.name MUST equal MCP 서버 등록 이름 and API endpoint_name
 ---
 apiVersion: ${KSERVE_API_VERSION}
 kind: InferenceService
@@ -11,7 +11,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ${MCP_NAME}
     app.kubernetes.io/component: mcp-server
-    csap.playmcp/managed-by: apply-inferenceservice-script
+    csap.probe/managed-by: apply-inferenceservice-script
 spec:
   predictor:
     serviceAccountName: ${SERVICE_ACCOUNT_NAME}
@@ -29,7 +29,7 @@ spec:
           - name: MCP_SERVER_NAME
             value: "${MCP_NAME}"
           - name: MCP_SERVER_VERSION
-            value: "2.1.1-playmcp-git"
+            value: "2.1.1-git"
           - name: PROBE_REPORT_DIR
             value: "/data/reports"
           - name: ENABLE_ACTIVE_TESTS
@@ -41,7 +41,7 @@ spec:
           - name: RUN_PROBE_ON_START
             value: "0"
           - name: ENV_PROFILE
-            value: "playmcp"
+            value: "hosted"
           - name: POD_NAME
             valueFrom:
               fieldRef:

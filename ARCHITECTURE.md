@@ -1,17 +1,17 @@
-# csap-node-escape-probe — 배포 구상 (PlayMCP MCP 서버와의 대응)
+# csap-node-escape-probe — 배포 구상 (MCP 서버와의 대응)
 
-> 지금 **GitHub에 push한 환경**을, PlayMCP가 MCP 서버를 올리는 방식과 **같은 레이어**로 나눠 본 문서입니다.
+> 지금 **GitHub에 push한 환경**을, 호스팅 UI가 MCP 서버를 올리는 방식과 **같은 레이어**로 나눠 본 문서입니다.
 
 ---
 
 ## 0. 한 줄 비교 (v2 — 통합)
 
-| | PlayMCP **일반 MCP 서버** | **csap-node-escape-probe** (v2) |
+| | 호스팅 UI **일반 MCP 서버** | **csap-node-escape-probe** (v2) |
 |--|--------------------------|----------------------------------|
 | 소스 | Git + 빌드 | **GitHub Private** `csap-node-escape-probe` |
 | 프로토콜 | Streamable HTTP `:8000/mcp` (KServe) | **동일** |
 | 추가 기능 | — | MCP·REST로 **이스케이프 진단** (`run_escape_probe`) |
-| UI 진입 | PlayMCP **Git/이미지 등록** | **동일** (포트 **8000**) |
+| UI 진입 | 호스팅 UI **Git/이미지 등록** | **동일** (포트 **8000**) |
 | 점검 목적 | Playground·API | MCP + **컨테이너→노드 표면** |
 
 ---
@@ -62,17 +62,17 @@ flowchart TB
     DEP_L --> POD
 ```
 
-PlayMCP MCP 서버도 **Git(또는 내부 repo) → 이미지 빌드 → 레지스트리 → K8s Deployment → Pod** 구조입니다.  
+MCP 서버도 **Git(또는 내부 repo) → 이미지 빌드 → 레지스트리 → K8s Deployment → Pod** 구조입니다.  
 v2부터 **④에서 MCP `/mcp`와 프로브 `/probe/*`를 동시에** 제공합니다.
 
 ---
 
-## 2. PlayMCP **이미지 등록 MCP** 흐름 (참고)
+## 2. 호스팅 UI **이미지 등록 MCP** 흐름 (참고)
 
 ```mermaid
 sequenceDiagram
     participant U as 점검자
-    participant UI as PlayMCP UI
+    participant UI as 호스팅 UI
     participant API as POST /api/v2/mcp/builder/image-mcp-servers
     participant REG as Container Registry
     participant K8s as Kubernetes
@@ -114,9 +114,9 @@ sequenceDiagram
     Pod-->>NODE: misconfig 시 /proc/1/root, /host, nsenter
 ```
 
-### 3.1 PlayMCP UI로 올리는 경우 (MCP 서버와 **가장 비슷**)
+### 3.1 호스팅 UI로 올리는 경우 (MCP 서버와 **가장 비슷**)
 
-이미지를 레지스트리에 push한 뒤 PlayMCP에서:
+이미지를 레지스트리에 push한 뒤 호스팅 UI에서:
 
 | UI 필드 | Escape Probe 값 |
 |---------|-------------------|
@@ -126,7 +126,7 @@ sequenceDiagram
 | 포트 | **18080** (MCP 기본 8080 아님) |
 
 → 백엔드가 **일반 워크로드 Pod**를 만들면, 구조상 MCP Pod와 **같은 슬롯**에 올라갑니다.  
-다만 PlayMCP Playground는 **MCP 프로토콜**을 기대하므로, 이스케이프 점검만 할 때는 **`kubectl` 직접 배포**가 낫습니다.
+다만 Playground는 **MCP 프로토콜**을 기대하므로, 이스케이프 점검만 할 때는 **`kubectl` 직접 배포**가 낫습니다.
 
 ---
 
@@ -134,7 +134,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph mcp_pod["PlayMCP MCP Server Pod (일반)"]
+    subgraph mcp_pod["MCP Server Pod (일반)"]
         M1["ENTRYPOINT MCP server"]
         M2[":8080 /mcp<br/>Streamable HTTP"]
         M3["Tools / OpenAPI"]
@@ -157,7 +157,7 @@ flowchart LR
 | 진입점 | MCP 런타임 | `entrypoint.sh` |
 | 주 서비스 | `/mcp` | `/health`, `POST /probe/run` |
 | 데이터 | Tool 호출 로그 | `risk_findings` JSON |
-| Service | PlayMCP Ingress 경유 | `k8s/service.yaml` :18080 |
+| Service | 호스팅 UI Ingress 경유 | `k8s/service.yaml` :18080 |
 
 ---
 
@@ -197,7 +197,7 @@ flowchart TB
 
 ## 6. 역할 매핑표 (팀 공유용)
 
-| PlayMCP / K8s 개념 | MCP 서버 워크로드 | Escape Probe (push한 repo) |
+| 호스팅 UI / K8s 개념 | MCP 서버 워크로드 | Escape Probe (push한 repo) |
 |--------------------|-------------------|----------------------------|
 | Application name | `my-mcp-server` (DNS 이름) | `csap-escape-probe` |
 | Container image | `registry/team/mcp-app:tag` | `registry/csap-node-escape-probe:v1` |
@@ -212,7 +212,7 @@ flowchart TB
 ## 7. 권장 점검 시나리오 (push 환경 기준)
 
 1. **GitHub** — Collaborator/PAT로 clone (소스 공유).
-2. **Registry** — `docker build` / `push` (PlayMCP 등록 또는 K8s `image:`).
+2. **Registry** — `docker build` / `push` (호스팅 UI 등록 또는 K8s `image:`).
 3. **baseline 배포** — `kubectl apply -f k8s/deployment-baseline.yaml`.
 4. **리포트** — `curl /probe/latest` → finding 거의 없음 확인.
 5. **lab 배포** (격리 NS) — `deployment-lab-misconfigured.yaml`.
@@ -229,4 +229,4 @@ flowchart TB
 
 ---
 
-*PlayMCP 번들 분석: 상위 `playmcp/02_architecture.md`, `04_api_endpoints.md` 참고.*
+*호스팅 UI 번들 분석: 상위 `02_architecture.md`, `04_api_endpoints.md` 참고.*

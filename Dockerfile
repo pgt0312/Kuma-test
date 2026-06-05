@@ -1,26 +1,26 @@
-# PlayMCP「Git 소스 빌드」용 MCP 서버 이미지
-# - 레포 루트에 Dockerfile 필수 (PlayMCP 기본: dockerfile=Dockerfile)
-# - KServe kserve-mcpserver 런타임: PORT=8000, TCP readiness (PlayMCP UI 포트도 8000)
+# Git 소스 빌드용 MCP 서버 이미지
+# - 레포 루트에 Dockerfile 필수 (기본: dockerfile=Dockerfile)
+# - KServe kserve-mcpserver 런타임: PORT=8000, TCP readiness (UI 포트도 8000)
 # - Streamable HTTP :${PORT}/mcp, GET /health
 FROM python:3.12-slim-bookworm
 
 LABEL org.opencontainers.image.title="csap-node-escape-probe" \
-      org.opencontainers.image.description="PlayMCP MCP + container escape surface probe (read-only)" \
-      playmcp.transport="streamablehttp" \
-      playmcp.port="8000" \
-      playmcp.path="/mcp"
+      org.opencontainers.image.description="MCP + container escape surface probe (read-only)" \
+      mcp.transport="streamablehttp" \
+      mcp.port="8000" \
+      mcp.path="/mcp"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     MCP_SERVER_NAME=csap-node-escape-probe \
-    MCP_SERVER_VERSION=2.1.1-playmcp-git \
+    MCP_SERVER_VERSION=2.1.1-git \
     PROBE_REPORT_DIR=/data/reports \
     ENABLE_ACTIVE_TESTS=0 \
     ENABLE_SAFE_NET_CHECKS=0 \
     PROBE_MIN_INTERVAL_SEC=60 \
     RUN_PROBE_ON_START=0 \
-    ENV_PROFILE=playmcp \
+    ENV_PROFILE=hosted \
     LOG_LEVEL=info
 
 WORKDIR /opt/app
