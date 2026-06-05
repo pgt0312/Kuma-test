@@ -2,7 +2,7 @@
 """
 PlayMCP 호환 MCP 서버 + 컨테이너→노드 이스케이프 진단.
 
-- MCP (PlayMCP / streamablehttp): http://<host>:8080/mcp
+- MCP (PlayMCP / streamablehttp): http://<host>:${PORT}/mcp (KServe 기본 PORT=8000)
 - 헬스: GET /health, /healthz
 - REST (호환): GET /probe/latest, POST /probe/run
 """
@@ -24,7 +24,7 @@ from probe.playmcp_monitoring import playmcp_monitoring_info
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
 
 SERVICE_NAME = os.environ.get("MCP_SERVER_NAME", "csap-node-escape-probe")
-SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.0-playmcp-git")
+SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.1-playmcp-git")
 
 mcp = FastMCP(
     SERVICE_NAME,
@@ -150,7 +150,7 @@ async def rest_probe_latest(_request: Request) -> JSONResponse:
 
 async def rest_manual(_request: Request) -> PlainTextResponse:
     return PlainTextResponse(
-        "PlayMCP: register image with port 8080, path /mcp. "
+        "PlayMCP: register with port 8000 (KServe kserve-mcpserver), path /mcp. "
         "MCP tools: echo, add, server_info, run_escape_probe, run_safe_verification, "
         "playmcp_monitoring_checklist. POST /probe/safe-verify = read-only checks only. "
         "Monitoring: GET /playmcp/monitoring-hints — see playmcp/24_playmcp_istio_inference_service.md"
@@ -161,13 +161,19 @@ async def rest_playmcp_monitoring(_request: Request) -> JSONResponse:
     return JSONResponse(playmcp_monitoring_info())
 
 
+def _probe_on_start_background() -> None:
+    try:
+        save_report()
+    except OSError:
+        pass
+
+
 @contextlib.asynccontextmanager
 async def lifespan(_app: Starlette):
-    if os.environ.get("RUN_PROBE_ON_START", "1") == "1":
-        try:
-            save_report()
-        except OSError:
-            pass
+    if os.environ.get("RUN_PROBE_ON_START", "0") == "1":
+        import threading
+
+        threading.Thread(target=_probe_on_start_background, daemon=True).start()
     async with mcp.session_manager.run():
         yield
 
@@ -190,7 +196,7 @@ app = Starlette(
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", "8080"))
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(
         "server:app",
         host="0.0.0.0",

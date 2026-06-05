@@ -9,9 +9,9 @@
 | | PlayMCP **일반 MCP 서버** | **csap-node-escape-probe** (v2) |
 |--|--------------------------|----------------------------------|
 | 소스 | Git + 빌드 | **GitHub Private** `csap-node-escape-probe` |
-| 프로토콜 | Streamable HTTP `:8080/mcp` | **동일** |
+| 프로토콜 | Streamable HTTP `:8000/mcp` (KServe) | **동일** |
 | 추가 기능 | — | MCP·REST로 **이스케이프 진단** (`run_escape_probe`) |
-| UI 진입 | PlayMCP **이미지 등록** | **동일** (포트 **8080**) |
+| UI 진입 | PlayMCP **Git/이미지 등록** | **동일** (포트 **8000**) |
 | 점검 목적 | Playground·API | MCP + **컨테이너→노드 표면** |
 
 ---

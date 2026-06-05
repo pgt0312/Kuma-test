@@ -31,11 +31,13 @@ spec:
           image: csap-node-escape-probe:local
           imagePullPolicy: IfNotPresent
           ports:
-            - name: http
-              containerPort: 8080
+            - name: user-port
+              containerPort: 8000
           env:
             - name: PORT
-              value: "8080"
+              value: "8000"
+            - name: RUN_PROBE_ON_START
+              value: "0"
             - name: ENABLE_ACTIVE_TESTS
               value: "0"
             - name: PROBE_IMAGE_TAG
@@ -74,7 +76,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: http
+              port: user-port
             initialDelaySeconds: 10
             periodSeconds: 30
       volumes:

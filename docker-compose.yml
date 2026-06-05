@@ -3,9 +3,10 @@ services:
     build: .
     image: csap-node-escape-probe:local
     ports:
-      - "8080:8080"
+      - "8000:8000"
     environment:
-      PORT: "8080"
+      PORT: "8000"
+      RUN_PROBE_ON_START: "0"
       ENABLE_ACTIVE_TESTS: "0"
       PROBE_IMAGE_TAG: "docker-compose"
       MCP_SERVER_NAME: "csap-node-escape-probe"

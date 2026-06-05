@@ -12,17 +12,18 @@ spec:
       - name: kserve-container
         image: REPLACE_REGISTRY/csap-node-escape-probe:playmcp-git
         ports:
-          - containerPort: 8080
+          - name: user-port
+            containerPort: 8000
         env:
           - name: PORT
-            value: "8080"
+            value: "8000"
           - name: MCP_SERVER_NAME
             value: "csap-node-escape-probe"
+          - name: RUN_PROBE_ON_START
+            value: "0"
         readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
+          tcpSocket:
+            port: user-port
         livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
+          tcpSocket:
+            port: user-port

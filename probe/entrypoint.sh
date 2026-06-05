@@ -1,9 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-echo "[entrypoint] ${MCP_SERVER_NAME:-csap-node-escape-probe} — MCP :8080/mcp + escape probe"
-
-PORT="${PORT:-8080}"
+PORT="${PORT:-8000}"
+echo "[entrypoint] ${MCP_SERVER_NAME:-csap-node-escape-probe} — MCP :${PORT}/mcp + escape probe"
 echo "[entrypoint] Streamable HTTP MCP at http://0.0.0.0:${PORT}/mcp"
 echo "[entrypoint] REST: /health /probe/latest POST /probe/run POST /probe/safe-verify"
 echo "[entrypoint] PlayMCP: register via Git build — see PLAYMCP_GIT_BUILD.md"

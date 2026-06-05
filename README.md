@@ -20,13 +20,15 @@
 | Git URL | 이 저장소 URL |
 | 브랜치 | `main` |
 | Dockerfile | `Dockerfile` (기본) |
-| 배포 후 포트 | **8080**, transport **streamablehttp**, path **`/mcp`** |
+| 배포 후 포트 | **8000** (KServe `kserve-mcpserver`), transport **streamablehttp**, path **`/mcp`** |
 
 ```bash
 docker build -t csap-node-escape-probe:playmcp-git .
-docker run --rm -p 8080:8080 csap-node-escape-probe:playmcp-git
-curl -s http://127.0.0.1:8080/health
+docker run --rm -p 8000:8000 csap-node-escape-probe:playmcp-git
+curl -s http://127.0.0.1:8000/health
 ```
+
+**모니터링 탭 InferenceService 오류** → 등록 후 [`scripts/apply-inferenceservice-for-playmcp.sh`](./scripts/apply-inferenceservice-for-playmcp.sh) 실행 ([`PLAYMCP_GIT_BUILD.md` §7](./PLAYMCP_GIT_BUILD.md#7-모니터링-오류-해결-1번-inferenceservice-없음)).
 
 ---
 
@@ -55,10 +57,10 @@ flowchart TB
         CURL[curl / CI]
     end
 
-    subgraph server["server.py :8080"]
+    subgraph server["server.py :PORT (기본 8000)"]
         MCP["/mcp"]
         REST["/health /probe/* /playmcp/*"]
-        LIFE["기동: RUN_PROBE_ON_START"]
+        LIFE["RUN_PROBE_ON_START=0 (PlayMCP)"]
     end
 
     subgraph diag["진단 (Pod 내부만)"]
@@ -85,7 +87,7 @@ PlayMCP InferenceService/Istio: [`../24_playmcp_istio_inference_service.md`](../
 
 | 메서드·경로 | 기능 | 진단 실행 |
 |-------------|------|-----------|
-| `http://<host>:8080/mcp` | MCP Streamable HTTP | 도구 호출 시 |
+| `http://<host>:8000/mcp` | MCP Streamable HTTP | 도구 호출 시 |
 | `GET /health`, `/healthz` | 생존 + `probe_ready` | ❌ |
 | `POST /probe/run` | **이스케이프 + 안전 검증** 통합 JSON | ✅ 전체 |
 | `GET`/`POST` `/probe/safe-verify` | **안전 검증만** (부하 최소) | ✅ V-* 만 |
@@ -123,7 +125,7 @@ PlayMCP InferenceService/Istio: [`../24_playmcp_istio_inference_service.md`](../
 
 | 상황 | 동작 |
 |------|------|
-| Pod 기동 (`RUN_PROBE_ON_START=1`) | **1회** `save_report()` |
+| Pod 기동 (기본 `RUN_PROBE_ON_START=0`) | PlayMCP: 즉시 Ready. `=1`이면 **백그라운드** 1회 프로브 |
 | Playground `echo`만 반복 | 진단 **재실행 안 함** |
 | `POST /probe/run` / `run_escape_probe` | 즉시 전체 진단 |
 | `PROBE_MIN_INTERVAL_SEC>0` | 간격 내 재호출 시 **캐시 반환** (`probe_throttled`) |
@@ -200,9 +202,9 @@ PlayMCP InferenceService/Istio: [`../24_playmcp_istio_inference_service.md`](../
 | 필드 | 값 |
 |------|-----|
 | MCP 이름 | `csap-node-escape-probe` (DNS 규칙) |
-| 포트 | **8080** |
+| 포트 | **8000** (`kc-mcp/kserve-cluster-serving-runtime: kserve-mcpserver`) |
 | Transport | `streamablehttp` |
-| MCP URL | `http://<svc>:8080/mcp` |
+| MCP URL | `http://<svc>:8000/mcp` |
 
 ```bash
 # Git 소스 빌드: PlayMCP가 clone 후 docker build (로컬 검증)
@@ -226,14 +228,29 @@ make push TAG=playmcp-git REGISTRY=$REGISTRY
 UI **「InferenceService가 없습니다」** → [`../24_playmcp_istio_inference_service.md`](../24_playmcp_istio_inference_service.md)
 
 ```bash
-curl -s http://127.0.0.1:8080/playmcp/monitoring-hints | python3 -m json.tool
+curl -s http://127.0.0.1:8000/playmcp/monitoring-hints | python3 -m json.tool
 MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-playmcp-istio-monitoring.sh
 ```
 
-### 10.3 호스팅 시 권장 env
+### 10.3 KServe 배포 시 주의 (InProgress 장기화 방지)
+
+PlayMCP 빌더가 만드는 Pod는 대략 다음과 같습니다.
+
+| 항목 | 플랫폼 동작 | 이 이미지 대응 (v2.1.1+) |
+|------|-------------|-------------------------|
+| `PORT` | `8000` 주입 | Dockerfile·entrypoint 기본 **8000** |
+| Readiness | **TCP** `user-port:8000` (HTTP `/health` 아님) | 포트를 빨리 열도록 기동 프로브 **비활성** |
+| `RUN_PROBE_ON_START` | — | 기본 **`0`** (진단은 Playground `run_escape_probe`) |
+| InferenceService | `serving.kserve.io/inferenceservice=<MCP이름>` | 등록 이름과 `endpoint_name` 일치 필요 |
+
+### 10.4 호스팅 시 권장 env
 
 ```yaml
 env:
+  - name: PORT
+    value: "8000"
+  - name: RUN_PROBE_ON_START
+    value: "0"
   - name: PROBE_MIN_INTERVAL_SEC
     value: "60"
   - name: ENABLE_SAFE_NET_CHECKS
@@ -261,9 +278,9 @@ env:
 
 ```bash
 kubectl apply -f k8s/deployment-baseline.yaml -f k8s/service.yaml
-kubectl port-forward svc/csap-escape-probe 8080:8080
-curl -s -X POST http://127.0.0.1:8080/probe/run | jq '.summary'
-curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
+kubectl port-forward svc/csap-escape-probe 8000:8000
+curl -s -X POST http://127.0.0.1:8000/probe/run | jq '.summary'
+curl -s http://127.0.0.1:8000/probe/safe-verify | jq '.risk_findings'
 ```
 
 ---
@@ -272,10 +289,10 @@ curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 
 | 변수 | 기본 | 설명 |
 |------|------|------|
-| `PORT` | `8080` | HTTP·MCP |
+| `PORT` | `8000` | HTTP·MCP (PlayMCP KServe와 동일) |
 | `MCP_SERVER_NAME` | `csap-node-escape-probe` | MCP·IS 이름 참고 |
-| `MCP_SERVER_VERSION` | `2.1.0-playmcp-git` | |
-| `RUN_PROBE_ON_START` | `1` | 기동 시 1회 프로브 |
+| `MCP_SERVER_VERSION` | `2.1.1-playmcp-git` | |
+| `RUN_PROBE_ON_START` | `0` | `1`이면 백그라운드 1회 프로브 (기동 블로킹 없음) |
 | `PROBE_REPORT_DIR` | `/data/reports` | JSON 저장 |
 | `ENABLE_ACTIVE_TESTS` | `0` | active_checks |
 | `ENABLE_SAFE_NET_CHECKS` | `0` | 169.254 / K8s API TCP |
@@ -337,10 +354,10 @@ make build && make run
 make mcp-health
 
 # 전체 진단
-curl -s -X POST http://127.0.0.1:8080/probe/run | python3 -m json.tool
+curl -s -X POST http://127.0.0.1:8000/probe/run | python3 -m json.tool
 
 # 가벼운 검증만
-curl -s http://127.0.0.1:8080/probe/safe-verify | python3 -m json.tool
+curl -s http://127.0.0.1:8000/probe/safe-verify | python3 -m json.tool
 
 # PlayMCP Playground: run_escape_probe, run_safe_verification, server_info
 ```

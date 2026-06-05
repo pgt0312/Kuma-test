@@ -12,6 +12,9 @@
 # 이 디렉터리 = Git remote 루트
 docker build -t csap-node-escape-probe:playmcp-git .
 make run
+
+# Git 등록 후 모니터링 오류(1번) — InferenceService 생성
+make apply-is NS=<ns> MCP_NAME=csap-node-escape-probe IMAGE=<registry>/...:tag
 ```
 
 기본(v2) 원본: [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/)
