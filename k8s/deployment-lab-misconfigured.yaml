@@ -29,10 +29,10 @@ spec:
             runAsUser: 0
             allowPrivilegeEscalation: true
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
           env:
             - name: PORT
-              value: "8000"
+              value: "8080"
             - name: RUN_PROBE_ON_START
               value: "0"
             - name: ENABLE_ACTIVE_TESTS

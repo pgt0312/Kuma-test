@@ -1,4 +1,4 @@
-# Git 소스 빌드 후 모니터링 탭용 InferenceService
+# 호스팅 배포 후 모니터링 탭용 InferenceService (Git·레지스트리 공통)
 # 적용: scripts/apply-inferenceservice.sh (envsubst)
 #
 # metadata.name MUST equal MCP 서버 등록 이름 and API endpoint_name
@@ -21,15 +21,15 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
           - name: user-port
-            containerPort: 8000
+            containerPort: 8080
             protocol: TCP
         env:
           - name: PORT
-            value: "8000"
+            value: "8080"
           - name: MCP_SERVER_NAME
             value: "${MCP_NAME}"
           - name: MCP_SERVER_VERSION
-            value: "2.1.1-git"
+            value: "2.2.0-hosting"
           - name: PROBE_REPORT_DIR
             value: "/data/reports"
           - name: ENABLE_ACTIVE_TESTS

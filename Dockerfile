@@ -1,20 +1,19 @@
-# Git 소스 빌드용 MCP 서버 이미지
-# - 레포 루트에 Dockerfile 필수 (기본: dockerfile=Dockerfile)
-# - KServe kserve-mcpserver 런타임: PORT=8000, TCP readiness (UI 포트도 8000)
-# - Streamable HTTP :${PORT}/mcp, GET /health
+# 호스팅 플랫폼 공통 MCP 이미지 (Git 빌드 / 레지스트리 동일)
+# - 등록 방식은 플랫폼 결정 — 개발자는 이 Dockerfile 하나만 유지
+# - PORT는 런타임 주입만 사용 (8080·8000 클러스터 모두 entrypoint가 따름)
+# - Streamable HTTP :${PORT}/mcp , GET /health
 FROM python:3.12-slim-bookworm
 
 LABEL org.opencontainers.image.title="csap-node-escape-probe" \
       org.opencontainers.image.description="MCP + container escape surface probe (read-only)" \
       mcp.transport="streamablehttp" \
-      mcp.port="8000" \
+      mcp.port="auto" \
       mcp.path="/mcp"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000 \
     MCP_SERVER_NAME=csap-node-escape-probe \
-    MCP_SERVER_VERSION=2.1.1-git \
+    MCP_SERVER_VERSION=2.2.0-hosting \
     PROBE_REPORT_DIR=/data/reports \
     ENABLE_ACTIVE_TESTS=0 \
     ENABLE_SAFE_NET_CHECKS=0 \
@@ -49,9 +48,9 @@ RUN chmod +x ./probe/entrypoint.sh ./probe/active_checks.sh \
 
 USER probeuser
 
-EXPOSE 8000
+EXPOSE 8080 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
-    CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
+    CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-8080}/health" || exit 1'
 
 ENTRYPOINT ["/opt/app/probe/entrypoint.sh"]

@@ -1,7 +1,7 @@
 # CSAP — MCP + 컨테이너 이스케이프·안전 검증 (확장본)
 
-> **「Git 소스 빌드」** — 이 폴더 **전체**를 Git remote 루트로 push (`Dockerfile`이 **루트**에 있음).  
-> UI 등록값·검증 절차: **[`GIT_BUILD.md`](./GIT_BUILD.md)**  
+> **호스팅 플랫폼용** — Git 빌드·레지스트리 등록 **방식은 플랫폼이 결정**. 이 폴더 **이미지 하나**만 맞추면 됨.  
+> 배포·Headlamp·RevisionFailed: **[`HOSTING.md`](./HOSTING.md)**  
 > **원본** [`../csap-node-escape-probe-internal/`](../csap-node-escape-probe-internal/) — v2 기본만 (`repo/` 하위 구조).
 
 | 구분 | `internal` (원본) | **`internal-full` (여기)** |
@@ -12,23 +12,22 @@
 
 ---
 
-## 0. Git 소스 빌드 (빠른 시작)
+## 0. 호스팅 배포 (빠른 시작)
 
-| UI 필드 | 값 |
-|---------|-----|
-| MCP 서버 이름 | `csap-node-escape-probe` |
-| Git URL | 이 저장소 URL |
-| 브랜치 | `main` |
-| Dockerfile | `Dockerfile` (기본) |
-| 배포 후 포트 | **8000** (KServe `kserve-mcpserver`), transport **streamablehttp**, path **`/mcp`** |
+등록(Git / 레지스트리)은 **플랫폼**이 처리합니다. 개발자 절차:
 
 ```bash
-docker build -t csap-node-escape-probe:git-build .
-docker run --rm -p 8000:8000 csap-node-escape-probe:git-build
-curl -s http://127.0.0.1:8000/health
+make verify TAG=git-build   # PORT 8080·8000 모두 검증
+git push origin main        # Git 빌드 경로일 때
 ```
 
-**모니터링 탭 InferenceService 오류** → 등록 후 [`scripts/apply-inferenceservice.sh`](./scripts/apply-inferenceservice.sh) 실행 ([`GIT_BUILD.md` §7](./GIT_BUILD.md#7-모니터링-오류-해결-inferenceservice-없음)).
+| 이미지 계약 | 값 |
+|-------------|-----|
+| MCP path | `/mcp` (streamablehttp) |
+| 포트 | **`PORT` env** (플랫폼 주입, 8080 또는 8000) |
+| Dockerfile | 루트 `Dockerfile` — **PORT 고정 없음** |
+
+상세: **[`HOSTING.md`](./HOSTING.md)** · 모니터링: [`../24_istio_inference_service_monitoring.md`](../24_istio_inference_service_monitoring.md)
 
 ---
 
@@ -57,7 +56,7 @@ flowchart TB
         CURL[curl / CI]
     end
 
-    subgraph server["server.py :PORT (기본 8000)"]
+    subgraph server["server.py :PORT (플랫폼 주입, 기본 8080)"]
         MCP["/mcp"]
         REST["/health /probe/* /monitoring/*"]
         LIFE["RUN_PROBE_ON_START=0"]
@@ -87,7 +86,7 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 
 | 메서드·경로 | 기능 | 진단 실행 |
 |-------------|------|-----------|
-| `http://<host>:8000/mcp` | MCP Streamable HTTP | 도구 호출 시 |
+| `http://<host>:${PORT}/mcp` | MCP Streamable HTTP | 도구 호출 시 |
 | `GET /health`, `/healthz` | 생존 + `probe_ready` | ❌ |
 | `POST /probe/run` | **이스케이프 + 안전 검증** 통합 JSON | ✅ 전체 |
 | `GET`/`POST` `/probe/safe-verify` | **안전 검증만** (부하 최소) | ✅ V-* 만 |
@@ -202,9 +201,9 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 | 필드 | 값 |
 |------|-----|
 | MCP 이름 | `csap-node-escape-probe` (DNS 규칙) |
-| 포트 | **8000** (`kc-mcp/kserve-cluster-serving-runtime: kserve-mcpserver`) |
+| 포트 | 플랫폼 `PORT` (**8080** 흔함, `kserve-mcpserver`) |
 | Transport | `streamablehttp` |
-| MCP URL | `http://<svc>:8000/mcp` |
+| MCP URL | `http://<svc>:${PORT}/mcp` |
 
 ```bash
 # Git 소스 빌드: 플랫폼이 clone 후 docker build (로컬 검증)
@@ -228,27 +227,51 @@ make push TAG=git-build REGISTRY=$REGISTRY
 UI **「InferenceService가 없습니다」** → [`../24_istio_inference_service_monitoring.md`](../24_istio_inference_service_monitoring.md)
 
 ```bash
-curl -s http://127.0.0.1:8000/monitoring/hints | python3 -m json.tool
+curl -s http://127.0.0.1:8080/monitoring/hints | python3 -m json.tool
 MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-istio-monitoring.sh
 ```
 
-### 10.3 KServe 배포 시 주의 (InProgress 장기화 방지)
+### 10.3 상세 정보 탭 (InProgress 화면)
+
+호스팅 UI **상세 정보** 예시 (`test1234` 등록 시):
+
+| 필드 | InProgress 시 | Active 후 |
+|------|---------------|-----------|
+| Endpoint URL | 비어 있음 (흔함) | URL 표시 |
+| Endpoint name | 등록 이름 (`test1234`) | 동일 — `MCP_NAME`·IS 이름 |
+| Namespace | `kbm-u-<작성자ID>` | 동일 — `kubectl` NS |
+| 지원 Tools | *등록된 Tool이 없습니다* | 8개 도구 목록 표시 |
+| MCP Server 설정 방법 | 비어 있을 수 있음 | 플랫폼 메타 |
+
+상세·대응 절차: [`HOSTING.md`](./HOSTING.md)
+
+### 10.4 KServe 배포 시 주의 (InProgress 장기화 방지)
 
 플랫폼 빌더가 만드는 Pod는 대략 다음과 같습니다.
 
 | 항목 | 플랫폼 동작 | 이 이미지 대응 (v2.1.1+) |
 |------|-------------|-------------------------|
-| `PORT` | `8000` 주입 | Dockerfile·entrypoint 기본 **8000** |
-| Readiness | **TCP** `user-port:8000` (HTTP `/health` 아님) | 포트를 빨리 열도록 기동 프로브 **비활성** |
+| `PORT` | 플랫폼 주입 (**8080** 또는 **8000**) | Dockerfile **PORT 고정 없음** — entrypoint가 따름 |
+| Readiness | **TCP** `user-port` = `PORT` | `RUN_PROBE_ON_START=0` 으로 즉시 listen |
 | `RUN_PROBE_ON_START` | — | 기본 **`0`** (진단은 Playground `run_escape_probe`) |
 | InferenceService | `serving.kserve.io/inferenceservice=<MCP이름>` | 등록 이름과 `endpoint_name` 일치 필요 |
 
-### 10.4 호스팅 시 권장 env
+### 10.5 `probe_ready` (호스팅 `/health`)
+
+| 시점 | `probe_ready` |
+|------|----------------|
+| Pod 기동 직후 (`RUN_PROBE_ON_START=0`) | `false` |
+| Playground `run_escape_probe` 1회 후 | `true` |
+| `RUN_PROBE_ON_START=1` | 기동 후 수 초 내 `true` (백그라운드 프로브) |
+
+호스팅 readiness는 **TCP user-port (= PORT)** 이라 `probe_ready`와 무관하게 **Active** 전환됩니다.
+
+### 10.6 호스팅 시 권장 env
 
 ```yaml
 env:
   - name: PORT
-    value: "8000"
+    value: "8080"
   - name: RUN_PROBE_ON_START
     value: "0"
   - name: PROBE_MIN_INTERVAL_SEC
@@ -278,9 +301,9 @@ env:
 
 ```bash
 kubectl apply -f k8s/deployment-baseline.yaml -f k8s/service.yaml
-kubectl port-forward svc/csap-escape-probe 8000:8000
-curl -s -X POST http://127.0.0.1:8000/probe/run | jq '.summary'
-curl -s http://127.0.0.1:8000/probe/safe-verify | jq '.risk_findings'
+kubectl port-forward svc/csap-escape-probe 8080:8080
+curl -s -X POST http://127.0.0.1:8080/probe/run | jq '.summary'
+curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 ```
 
 ---
@@ -289,9 +312,9 @@ curl -s http://127.0.0.1:8000/probe/safe-verify | jq '.risk_findings'
 
 | 변수 | 기본 | 설명 |
 |------|------|------|
-| `PORT` | `8000` | HTTP·MCP (KServe와 동일) |
+| `PORT` | *(플랫폼 주입, 8080 또는 8000)* | Dockerfile에 고정하지 않음 |
 | `MCP_SERVER_NAME` | `csap-node-escape-probe` | MCP·IS 이름 참고 |
-| `MCP_SERVER_VERSION` | `2.1.1-git-build` | |
+| `MCP_SERVER_VERSION` | `2.2.0-hosting` | |
 | `RUN_PROBE_ON_START` | `0` | `1`이면 백그라운드 1회 프로브 (기동 블로킹 없음) |
 | `PROBE_REPORT_DIR` | `/data/reports` | JSON 저장 |
 | `ENABLE_ACTIVE_TESTS` | `0` | active_checks |
@@ -354,10 +377,10 @@ make build && make run
 make mcp-health
 
 # 전체 진단
-curl -s -X POST http://127.0.0.1:8000/probe/run | python3 -m json.tool
+curl -s -X POST http://127.0.0.1:8080/probe/run | python3 -m json.tool
 
 # 가벼운 검증만
-curl -s http://127.0.0.1:8000/probe/safe-verify | python3 -m json.tool
+curl -s http://127.0.0.1:8080/probe/safe-verify | python3 -m json.tool
 
 # Playground: run_escape_probe, run_safe_verification, server_info
 ```
@@ -366,6 +389,8 @@ curl -s http://127.0.0.1:8000/probe/safe-verify | python3 -m json.tool
 
 ## 17. 관련 문서
 
+- 호스팅 배포·InProgress·RevisionFailed: [`HOSTING.md`](./HOSTING.md)
 - 원본(기본): [`../csap-node-escape-probe-internal/README.md`](../csap-node-escape-probe-internal/README.md)
 - 공개 정리본: [`../csap-node-escape-probe/README.md`](../csap-node-escape-probe/README.md)
+- Istio 모니터링: [`../24_istio_inference_service_monitoring.md`](../24_istio_inference_service_monitoring.md)
 - 호스팅 UI 번들: [`ARCHITECTURE.md`](ARCHITECTURE.md)

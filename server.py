@@ -2,7 +2,7 @@
 """
 Streamable HTTP MCP 서버 + 컨테이너→노드 이스케이프 진단.
 
-- MCP (streamablehttp): http://<host>:${PORT}/mcp (KServe 기본 PORT=8000)
+- MCP (streamablehttp): http://<host>:${PORT}/mcp (KServe kserve-mcpserver 가 PORT 주입, 보통 8080)
 - 헬스: GET /health, /healthz
 - REST (호환): GET /probe/latest, POST /probe/run
 """
@@ -24,7 +24,7 @@ from probe.monitoring_hints import monitoring_info
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
 
 SERVICE_NAME = os.environ.get("MCP_SERVER_NAME", "csap-node-escape-probe")
-SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.1.1-git")
+SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.2.0-hosting")
 
 mcp = FastMCP(
     SERVICE_NAME,
@@ -118,6 +118,14 @@ def run_active_escape_checks() -> str:
     return (proc.stdout or "") + (proc.stderr or "")
 
 
+def _listen_port() -> int:
+    for key in ("PORT", "KMP_PORT"):
+        val = os.environ.get(key, "").strip()
+        if val.isdigit():
+            return int(val)
+    return 8080
+
+
 async def health(_request: Request) -> JSONResponse:
     latest = load_latest_report()
     return JSONResponse(
@@ -125,6 +133,7 @@ async def health(_request: Request) -> JSONResponse:
             "status": "ok",
             "service": SERVICE_NAME,
             "version": SERVICE_VERSION,
+            "listen_port": _listen_port(),
             "mcp_endpoint": "/mcp",
             "probe_ready": latest is not None,
             "probe_max_severity": (latest or {}).get("summary", {}).get("max_severity"),
@@ -150,10 +159,10 @@ async def rest_probe_latest(_request: Request) -> JSONResponse:
 
 async def rest_manual(_request: Request) -> PlainTextResponse:
     return PlainTextResponse(
-        "Register with port 8000 (KServe kserve-mcpserver), path /mcp. "
+        "KServe kserve-mcpserver: use platform-injected PORT (usually 8080), path /mcp. "
         "MCP tools: echo, add, server_info, run_escape_probe, run_safe_verification, "
         "monitoring_checklist. POST /probe/safe-verify = read-only checks only. "
-        "Monitoring: GET /monitoring/hints — see GIT_BUILD.md / 24_istio_inference_service_monitoring.md"
+        "Monitoring: GET /monitoring/hints — see HOSTING.md / 24_istio_inference_service_monitoring.md"
     )
 
 
@@ -196,7 +205,7 @@ app = Starlette(
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", "8000"))
+    port = _listen_port()
     uvicorn.run(
         "server:app",
         host="0.0.0.0",

@@ -1,10 +1,14 @@
 IMAGE ?= csap-node-escape-probe
 TAG ?= git-build
 REGISTRY ?=
-PORT ?= 8000
+PORT ?= 8080
 DOCKER_CONFIG ?= /tmp/docker-nocreds
 
-.PHONY: build run stop snapshot mcp-health logs push k8s-deploy apply-is check-is docker-config
+.PHONY: build run stop snapshot mcp-health logs push k8s-deploy apply-is check-is docker-config verify
+
+verify:
+	chmod +x scripts/verify-hosting.sh scripts/verify-git-build.sh
+	IMAGE=$(IMAGE):$(TAG) ./scripts/verify-hosting.sh
 
 docker-config:
 	@mkdir -p $(DOCKER_CONFIG)

@@ -13,10 +13,10 @@ spec:
         image: REPLACE_REGISTRY/csap-node-escape-probe:git-build
         ports:
           - name: user-port
-            containerPort: 8000
+            containerPort: 8080
         env:
           - name: PORT
-            value: "8000"
+            value: "8080"
           - name: MCP_SERVER_NAME
             value: "csap-node-escape-probe"
           - name: RUN_PROBE_ON_START
