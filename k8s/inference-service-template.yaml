@@ -29,7 +29,7 @@ spec:
           - name: MCP_SERVER_NAME
             value: "${MCP_NAME}"
           - name: MCP_SERVER_VERSION
-            value: "2.2.0-hosting"
+            value: "2.3.0-network"
           - name: PROBE_REPORT_DIR
             value: "/data/reports"
           - name: ENABLE_ACTIVE_TESTS

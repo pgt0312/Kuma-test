@@ -90,6 +90,7 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 | `GET /health`, `/healthz` | 생존 + `probe_ready` | ❌ |
 | `POST /probe/run` | **이스케이프 + 안전 검증** 통합 JSON | ✅ 전체 |
 | `GET`/`POST` `/probe/safe-verify` | **안전 검증만** (부하 최소) | ✅ V-* 만 |
+| `GET`/`POST` `/network/192-168/check` | 192.168.0.0/16 제한 TCP 도달성 확인 | ✅ 선택 |
 | `GET /probe/latest` | 마지막 저장 리포트 | ❌ 조회 |
 | `GET /probe/manual` | 수동 검증 안내 | ❌ |
 | `GET /monitoring/hints` | 모니터링 점검 JSON | ❌ 힌트 |
@@ -114,6 +115,7 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 |------|------|
 | `run_escape_probe` | `R-*` + `V-*` 통합 JSON, 저장 |
 | `run_safe_verification` | `V-*` 만 (가벼움) |
+| `check_192_168_connectivity` | `ENABLE_SAFE_NET_CHECKS=1` 일 때 192.168 대역 제한 TCP 확인 |
 | `get_escape_probe_summary` | 마지막 리포트 요약 텍스트 |
 | `run_active_escape_checks` | `ENABLE_ACTIVE_TESTS=1` → `active_checks.sh` |
 | `monitoring_checklist` | InferenceService/Istio UI 오류 대응 안내 |
@@ -127,6 +129,7 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 | Pod 기동 (기본 `RUN_PROBE_ON_START=0`) | 호스팅 UI: 즉시 Ready. `=1`이면 **백그라운드** 1회 프로브 |
 | Playground `echo`만 반복 | 진단 **재실행 안 함** |
 | `POST /probe/run` / `run_escape_probe` | 즉시 전체 진단 |
+| `/network/192-168/check` / `check_192_168_connectivity` | `ENABLE_SAFE_NET_CHECKS=1` 일 때만 제한 TCP 확인 |
 | `PROBE_MIN_INTERVAL_SEC>0` | 간격 내 재호출 시 **캐시 반환** (`probe_throttled`) |
 
 ---
@@ -194,9 +197,36 @@ InferenceService/Istio: [`../24_istio_inference_service_monitoring.md`](../24_is
 
 ---
 
-## 10. 호스팅 연동
+## 10. 192.168 대역 통신 확인 (선택)
 
-### 10.1 이미지 등록
+`ENABLE_SAFE_NET_CHECKS=1` 일 때만 동작합니다. 전체 대역 포트스캔이 아니라, 지정한 IP/CIDR을 **최대 개수 제한** 안에서 짧은 TCP connect로만 확인합니다.
+
+```bash
+# 기본 후보 IP + 기본 포트(80,443,8000,8080)
+curl -s -X POST http://127.0.0.1:8080/network/192-168/check | python3 -m json.tool
+
+# 특정 대상만 확인
+curl -s -X POST http://127.0.0.1:8080/network/192-168/check \
+  -H 'content-type: application/json' \
+  -d '{"hosts":["192.168.10.1","192.168.10.10","192.168.20.0/30"],"ports":[80,443,8080],"timeout_sec":0.7,"max_hosts":16}' \
+  | python3 -m json.tool
+```
+
+MCP Playground에서는 `check_192_168_connectivity` 도구를 호출합니다. `hosts`와 `ports`는 쉼표 문자열로도 전달할 수 있습니다.
+
+| 제한 | 값 |
+|------|-----|
+| 허용 CIDR | `192.168.0.0/16` 만 |
+| 기본 포트 | `80,443,8000,8080` |
+| 최대 host | 기본 32, 하드 제한 128 |
+| 최대 port | 하드 제한 16 |
+| timeout | 기본 0.7초, 최대 3초 |
+
+---
+
+## 11. 호스팅 연동
+
+### 11.1 이미지 등록
 
 | 필드 | 값 |
 |------|-----|
@@ -215,7 +245,7 @@ make build TAG=git-build
 make push TAG=git-build REGISTRY=$REGISTRY
 ```
 
-### 10.2 MCP vs 모니터링 vs Kubelet
+### 11.2 MCP vs 모니터링 vs Kubelet
 
 | 기능 | 이 이미지 | 호스팅 플랫폼 |
 |------|-----------|----------------|
@@ -231,7 +261,7 @@ curl -s http://127.0.0.1:8080/monitoring/hints | python3 -m json.tool
 MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-istio-monitoring.sh
 ```
 
-### 10.3 상세 정보 탭 (InProgress 화면)
+### 11.3 상세 정보 탭 (InProgress 화면)
 
 호스팅 UI **상세 정보** 예시 (`test1234` 등록 시):
 
@@ -245,7 +275,7 @@ MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-istio-monitoring.sh
 
 상세·대응 절차: [`HOSTING.md`](./HOSTING.md)
 
-### 10.4 KServe 배포 시 주의 (InProgress 장기화 방지)
+### 11.4 KServe 배포 시 주의 (InProgress 장기화 방지)
 
 플랫폼 빌더가 만드는 Pod는 대략 다음과 같습니다.
 
@@ -256,7 +286,7 @@ MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-istio-monitoring.sh
 | `RUN_PROBE_ON_START` | — | 기본 **`0`** (진단은 Playground `run_escape_probe`) |
 | InferenceService | `serving.kserve.io/inferenceservice=<MCP이름>` | 등록 이름과 `endpoint_name` 일치 필요 |
 
-### 10.5 `probe_ready` (호스팅 `/health`)
+### 11.5 `probe_ready` (호스팅 `/health`)
 
 | 시점 | `probe_ready` |
 |------|----------------|
@@ -266,7 +296,7 @@ MCP_NAME=csap-node-escape-probe NS=<ns> ../scripts/check-istio-monitoring.sh
 
 호스팅 readiness는 **TCP user-port (= PORT)** 이라 `probe_ready`와 무관하게 **Active** 전환됩니다.
 
-### 10.6 호스팅 시 권장 env
+### 11.6 호스팅 시 권장 env
 
 ```yaml
 env:
@@ -292,7 +322,7 @@ env:
 
 ---
 
-## 11. Kubernetes 프로파일
+## 12. Kubernetes 프로파일
 
 | 프로파일 | 파일 | 기대 |
 |----------|------|------|
@@ -308,24 +338,28 @@ curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 
 ---
 
-## 12. 환경 변수
+## 13. 환경 변수
 
 | 변수 | 기본 | 설명 |
 |------|------|------|
 | `PORT` | *(플랫폼 주입, 8080 또는 8000)* | Dockerfile에 고정하지 않음 |
 | `MCP_SERVER_NAME` | `csap-node-escape-probe` | MCP·IS 이름 참고 |
-| `MCP_SERVER_VERSION` | `2.2.0-hosting` | |
+| `MCP_SERVER_VERSION` | `2.3.0-network` | |
 | `RUN_PROBE_ON_START` | `0` | `1`이면 백그라운드 1회 프로브 (기동 블로킹 없음) |
 | `PROBE_REPORT_DIR` | `/data/reports` | JSON 저장 |
 | `ENABLE_ACTIVE_TESTS` | `0` | active_checks |
-| `ENABLE_SAFE_NET_CHECKS` | `0` | 169.254 / K8s API TCP |
+| `ENABLE_SAFE_NET_CHECKS` | `0` | 169.254 / K8s API TCP + 192.168 제한 TCP 확인 |
+| `NET_CHECK_192_168_TARGETS` | 기본 후보 | 쉼표 구분 IP/CIDR, `192.168.0.0/16` 내부만 |
+| `NET_CHECK_192_168_PORTS` | `80,443,8000,8080` | 쉼표 구분 TCP 포트 |
+| `NET_CHECK_MAX_HOSTS` | `32` | 최대 대상 host, 하드 제한 128 |
+| `NET_CHECK_TIMEOUT_SEC` | `0.7` | TCP connect timeout, 최대 3초 |
 | `PROBE_MIN_INTERVAL_SEC` | `0` | 연속 프로브 제한(초) |
 | `ENV_PROFILE` | `test` | |
 | `POD_NAME` / `POD_NAMESPACE` / `NODE_NAME` | — | downward API 권장 |
 
 ---
 
-## 13. 리포트 JSON 예시
+## 14. 리포트 JSON 예시
 
 ```json
 {
@@ -346,30 +380,32 @@ curl -s http://127.0.0.1:8080/probe/safe-verify | jq '.risk_findings'
 
 ---
 
-## 14. 포함하지 않는 것
+## 15. 포함하지 않는 것
 
 - Kubelet API·노드 SSH·다른 Pod 조작
 - 환경 변수 **값** 수집·exfil
+- 무제한 네트워크/포트 스캔
 - 자동 익스플로잇·쉘 설치
 - 호스팅 Prometheus 직접 연동
 - 모든 HTTP 요청에 대한 자동 전체 진단
 
 ---
 
-## 15. 디렉터리
+## 16. 디렉터리
 
 | 경로 | 용도 |
 |------|------|
 | [`server.py`](./server.py) | FastMCP + Starlette |
 | [`probe/run_probe.py`](./probe/run_probe.py) | `R-*` |
 | [`probe/safe_verification.py`](./probe/safe_verification.py) | `V-*` |
+| [`probe/network_checks.py`](./probe/network_checks.py) | 192.168 제한 TCP 도달성 |
 | [`probe/monitoring_hints.py`](./probe/monitoring_hints.py) | UI 힌트 |
 | [`probe/active_checks.sh`](./probe/active_checks.sh) | 활성 읽기 검사 |
 | [`k8s/`](./k8s/) | baseline / lab |
 
 ---
 
-## 16. 빠른 명령
+## 17. 빠른 명령
 
 ```bash
 cd 이 디렉터리
@@ -382,12 +418,18 @@ curl -s -X POST http://127.0.0.1:8080/probe/run | python3 -m json.tool
 # 가벼운 검증만
 curl -s http://127.0.0.1:8080/probe/safe-verify | python3 -m json.tool
 
-# Playground: run_escape_probe, run_safe_verification, server_info
+# 192.168 대역 제한 TCP 확인 (ENABLE_SAFE_NET_CHECKS=1 필요)
+curl -s -X POST http://127.0.0.1:8080/network/192-168/check \
+  -H 'content-type: application/json' \
+  -d '{"hosts":["192.168.10.1","192.168.10.10"],"ports":[80,443,8080]}' \
+  | python3 -m json.tool
+
+# Playground: run_escape_probe, run_safe_verification, check_192_168_connectivity, server_info
 ```
 
 ---
 
-## 17. 관련 문서
+## 18. 관련 문서
 
 - 호스팅 배포·InProgress·RevisionFailed: [`HOSTING.md`](./HOSTING.md)
 - 원본(기본): [`../csap-node-escape-probe-internal/README.md`](../csap-node-escape-probe-internal/README.md)

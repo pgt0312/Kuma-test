@@ -22,6 +22,7 @@ test_port() {
   lp=$(curl --noproxy "*" -fsS "http://127.0.0.1:${HOST_PORT}/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('listen_port','?'))")
   [ "$lp" = "$PORT" ] || { echo "[verify] FAIL: listen_port=$lp expected $PORT"; exit 1; }
   curl --noproxy "*" -fsS "http://127.0.0.1:${HOST_PORT}/probe/safe-verify" >/dev/null
+  curl --noproxy "*" -fsS "http://127.0.0.1:${HOST_PORT}/network/192-168/check" | python3 -c "import sys,json; print('network_check_enabled=', json.load(sys.stdin).get('enabled'))"
 
   code=$(curl --noproxy "*" -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:${HOST_PORT}/mcp")
   echo "POST /mcp -> HTTP $code"

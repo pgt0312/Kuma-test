@@ -21,10 +21,11 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
 
 from probe.monitoring_hints import monitoring_info
+from probe.network_checks import check_192_168_connectivity as run_192_168_connectivity_check
 from probe.run_probe import build_safe_verification_report, load_latest_report, save_report
 
 SERVICE_NAME = os.environ.get("MCP_SERVER_NAME", "csap-node-escape-probe")
-SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.2.0-hosting")
+SERVICE_VERSION = os.environ.get("MCP_SERVER_VERSION", "2.3.0-network")
 
 mcp = FastMCP(
     SERVICE_NAME,
@@ -33,6 +34,7 @@ mcp = FastMCP(
         "CSAP 점검용 MCP 서버입니다. "
         "echo/add/server_info 로 연결을 확인하고, "
         "run_escape_probe 로 컨테이너→노드 이스케이프 표면을 진단하세요. "
+        "check_192_168_connectivity 로 승인된 사설망 TCP 도달성을 확인할 수 있습니다. "
         "자동 익스플로잇은 수행하지 않습니다."
     ),
 )
@@ -60,7 +62,7 @@ def server_info() -> dict[str, Any]:
         "env_profile": os.environ.get("ENV_PROFILE", "test"),
         "transport": "streamable-http",
         "mcp_path": "/mcp",
-        "modes": ["mcp", "escape_probe"],
+        "modes": ["mcp", "escape_probe", "bounded_network_check"],
         "monitoring_hints": monitoring_info(),
     }
 
@@ -81,6 +83,22 @@ def run_escape_probe() -> dict[str, Any]:
 def run_safe_verification() -> dict[str, Any]:
     """읽기 전용 강화·설정 검증만 수행 (이스케이프 전체 스캔 생략, 서비스 부하 최소)."""
     return build_safe_verification_report()
+
+
+@mcp.tool()
+def check_192_168_connectivity(
+    hosts: str | None = None,
+    ports: str | None = None,
+    timeout_sec: float | None = None,
+    max_hosts: int | None = None,
+) -> dict[str, Any]:
+    """ENABLE_SAFE_NET_CHECKS=1 일 때만 192.168.0.0/16 TCP 도달성을 제한적으로 확인."""
+    return run_192_168_connectivity_check(
+        hosts=hosts,
+        ports=ports,
+        timeout_sec=timeout_sec,
+        max_hosts=max_hosts,
+    )
 
 
 @mcp.tool()
@@ -150,6 +168,25 @@ async def rest_safe_verify(_request: Request) -> JSONResponse:
     return JSONResponse(build_safe_verification_report())
 
 
+async def rest_192_168_check(request: Request) -> JSONResponse:
+    body: dict[str, Any] = {}
+    if request.method == "POST":
+        try:
+            parsed = await request.json()
+            if isinstance(parsed, dict):
+                body = parsed
+        except Exception:  # noqa: BLE001
+            body = {}
+    return JSONResponse(
+        run_192_168_connectivity_check(
+            hosts=body.get("hosts"),
+            ports=body.get("ports"),
+            timeout_sec=body.get("timeout_sec"),
+            max_hosts=body.get("max_hosts"),
+        )
+    )
+
+
 async def rest_probe_latest(_request: Request) -> JSONResponse:
     report = load_latest_report()
     if report is None:
@@ -161,7 +198,9 @@ async def rest_manual(_request: Request) -> PlainTextResponse:
     return PlainTextResponse(
         "KServe kserve-mcpserver: use platform-injected PORT (usually 8080), path /mcp. "
         "MCP tools: echo, add, server_info, run_escape_probe, run_safe_verification, "
-        "monitoring_checklist. POST /probe/safe-verify = read-only checks only. "
+        "check_192_168_connectivity, monitoring_checklist. "
+        "POST /probe/safe-verify = read-only checks only. "
+        "POST /network/192-168/check = bounded 192.168 TCP checks. "
         "Monitoring: GET /monitoring/hints — see HOSTING.md / 24_istio_inference_service_monitoring.md"
     )
 
@@ -193,6 +232,7 @@ app = Starlette(
         Route("/healthz", health, methods=["GET"]),
         Route("/probe/run", rest_probe_run, methods=["POST"]),
         Route("/probe/safe-verify", rest_safe_verify, methods=["POST", "GET"]),
+        Route("/network/192-168/check", rest_192_168_check, methods=["POST", "GET"]),
         Route("/probe/latest", rest_probe_latest, methods=["GET"]),
         Route("/probe/manual", rest_manual, methods=["GET"]),
         Route("/monitoring/hints", rest_monitoring_hints, methods=["GET"]),
